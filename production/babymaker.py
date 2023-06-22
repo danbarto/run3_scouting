@@ -21,15 +21,18 @@ import socket
 import gzip
 
 class scouting_object:
-    def __init__(self, type=None):
-        self.type=type
-    @classmethod
-    def from_root(cls, root_object, type=None):
-        cls.type = type
+    def __init__(self, root_object):
+        self.type='root'
         for x in root_object.__dir__():
             if not x.startswith('_'):
-                setattr(cls, x, getattr(root_object, x)())
-        return cls
+                setattr(self, x, getattr(root_object, x)())
+    #@classmethod
+    #def from_root(cls, root_object):
+    #    #cls.type = type
+    #    for x in root_object.__dir__():
+    #        if not x.startswith('_'):
+    #            setattr(cls, x, getattr(root_object, x)())
+    #    return cls
 
 MUON_MASS = 0.10566
 randid = str(uuid.uuid4()).split("-")[0]
@@ -40,8 +43,8 @@ if fast:
 
 isuaf = any(x in socket.gethostname() for x in ["uaf-","cabinet-","sdsc-"])
 def xrootdify(fname):
-    if ("/hadoop/cms/store/user/namin/" in fname) and not isuaf:
-        fname = "root://redirector.t2.ucsd.edu/" + fname.replace("/hadoop/cms","")
+    if ("/ceph/cms/store/user/" in fname) and not isuaf:
+        fname = "root://redirector.t2.ucsd.edu/" + fname.replace("/ceph/cms","")
     if fname.startswith("/store"):
         fname = "root://cmsxrootd.fnal.gov/" + fname
     return fname
@@ -112,13 +115,13 @@ def get_filter_eff_info(origch):
     return dict(npassed=npassed, ntotal=ntotal, nfiles=nfiles)
 
 def get_track_reference_point(muon):
-    pt = muon.pt()
-    eta = muon.eta()
-    phi = muon.phi()
+    pt = muon.pt
+    eta = muon.eta
+    phi = muon.phi
 
-    dsz = muon.trk_dsz()
-    dz = muon.trk_dz()
-    lmb = muon.trk_lambda()
+    dsz = muon.trk_dsz
+    dz = muon.trk_dz
+    lmb = muon.trk_lambda
     dxy = muon.dxyCorr
 
     sinphi = math.sin(phi)
@@ -179,6 +182,8 @@ def pick_best_objects(dvs, muons, run, is_mc):
     ret["bestidv"] = -1
 
     bugged_branches = ((100000 < run < 305405) and not is_mc)
+
+    # Passed
 
     # Make some mappings from muon to DV indices and vice versa
     d_imuon_to_idv = {}
@@ -600,11 +605,11 @@ class Looper(object):
         self.load_prop_code()
         refx, refy, refz = get_track_reference_point(muon)
         vec = r.TLorentzVector()
-        vec.SetPtEtaPhiM(muon.pt(), muon.eta(), muon.phi(), MUON_MASS)
+        vec.SetPtEtaPhiM(muon.pt, muon.eta, muon.phi, MUON_MASS)
         newphi = r.recalculate_phi_at_DV(
             refx, refy, refz, vec.Px(), vec.Py(), vec.Pz(),
-            muon.charge(),
-            dv.x(), dv.y(),
+            muon.charge,
+            dv.x, dv.y,
             )
         return newphi
 
@@ -868,7 +873,7 @@ class Looper(object):
                 print(">>> [currevt={}] Last {} events in {:.2f} seconds @ {:.1f}Hz".format(nnow,nnow-nprev,(tnow-tprev),(nnow-nprev)/(tnow-tprev)))
                 tprev = tnow
                 nprev = nnow
-            if (self.nevents > 0) and (ievt > self.nevents): break
+            if (self.nevents > 0) and (ievt >= self.nevents): break
 
             ievt += 1
             if self.has_gen_info:
@@ -903,9 +908,20 @@ class Looper(object):
                     d_ggphi_info["luminosityBlock"] = lumi
                     fh_ggphi.write(str(d_ggphi_info) + "\n")
 
-            dvs = [ scouting_object.from_root(x, 'dv') for x in evt.Run3ScoutingVertexs_hltScoutingMuonPacker_displacedVtx_HLT.product() ]
-            muons = [ scouting_object.from_root(x, 'muon') for x in evt.Run3ScoutingMuons_hltScoutingMuonPacker__HLT.product() ]
+            dvs = [ scouting_object(x) for x in evt.Run3ScoutingVertexs_hltScoutingMuonPacker_displacedVtx_HLT.product() ]
+            muons = [ scouting_object(x) for x in evt.Run3ScoutingMuons_hltScoutingMuonPacker__HLT.product() ]
+            #test = []
+            #for x in evt.Run3ScoutingMuons_hltScoutingMuonPacker__HLT.product():
+            #    print("next")
+            #    print(x.pt(), x.charge())
+            #    tmp = scouting_object(x)
+            #    print(tmp.pt, tmp.charge)
+            #    test.append(tmp)
+            #print([t.charge for t in test])
             if not dvs: dvs = []
+
+            #print([m.charge for m in muons])
+            #print([m.pt for m in muons])
 
             # NOTE, this guarantees HLT bit. if we have a DV in the collection, our HLT trigger of interest
             # must have (and did) fire
@@ -914,6 +930,8 @@ class Looper(object):
                 if len(muons) < 2: continue
             # To verify, one could check bool(evt.bools_triggerMaker_hltresult_SLIM.product()[0])
             # for every event, but I already did that.
+
+            #print("Skim requirement passed.")
 
             if self.fourmu:
                 if len(dvs) < 2: continue
@@ -981,9 +999,17 @@ class Looper(object):
 
             # If we don't have a good DV with 2 matched muons, skip the event
             if self.skim:
-                if info["bestidv"] < 0: continue
-                if info["bestimu1"] < 0: continue
-                if info["bestimu2"] < 0: continue
+                if info["bestidv"] < 0:
+                    #print("No DV")
+                    continue
+                if info["bestimu1"] < 0:
+                    #print("No best Mu1")
+                    continue
+                if info["bestimu2"] < 0:
+                    #print("No best Mu2")
+                    continue
+
+            #print("Made it past DV->mumu req")
 
             selected_dvs = [dvs[info["bestidv"]]]
             selected_muons = [muons[info["bestimu1"]], muons[info["bestimu2"]]]
@@ -1212,7 +1238,7 @@ class Looper(object):
                 # get appropriate DV for this muon (order matches selected_dvs, with 2 muons per dv)
                 dv = selected_dvs[1 if imuon >= 2 else 0]
                 # https://github.com/cms-sw/cmssw/blob/master/DataFormats/TrackReco/interface/TrackBase.h#L24
-                muon.dxyCorr = -(dv.x()-pvmx)*math.sin(muon.phi()) + (dv.y()-pvmy)*math.cos(muon.phi())
+                muon.dxyCorr = -(dv.x-pvmx)*math.sin(muon.phi) + (dv.y-pvmy)*math.cos(muon.phi)
                 branches[pfx+"dxyCorr"][0] = muon.dxyCorr
 
                 refx, refy, refz = get_track_reference_point(muon)
@@ -1228,20 +1254,20 @@ class Looper(object):
                 # https://github.com/cms-sw/cmssw/blob/CMSSW_9_2_10/HLTrigger/Muon/src/HLTScoutingMuonProducer.cc#L161
                 # and nValidMuonHits also 0, so we scrap this cut, even for 2018, for simplicity
                 muon.passid = (
-                        (muon.trk_chi2()/muon.trk_ndof() < 3.0) and
+                        (muon.trk_chi2/muon.trk_ndof < 3.0) and
                         # (muon.nValidMuonHits() > 0) and
-                        (muon.nTrackerLayersWithMeasurement() > 5)
+                        (muon.nTrackerLayersWithMeasurement > 5)
                         # (muon.dxyError() < 0.01)
                         )
-                muon.passiso = ((muon.trackIso() < 0.1) and  (drjet > 0.3))
-                muon.passiso4mu = ((muon.trackIso() < 0.2) and  (drjet > 0.3))
+                muon.passiso = ((muon.trackIso < 0.1) and  (drjet > 0.3))
+                muon.passiso4mu = ((muon.trackIso < 0.2) and  (drjet > 0.3))
                 branches[pfx+"passid"][0] = muon.passid
                 branches[pfx+"passiso"][0] = muon.passiso
                 branches[pfx+"passiso4mu"][0] = muon.passiso4mu
 
                 # Find closest GenMuon by DeltaR and also embed the info into the muon branches for convenience
                 matched_genmu = None
-                calc_dr = lambda x: math.hypot(eta-x.eta(), delta_phi(phi,x.phi()))
+                calc_dr = lambda x: math.hypot(eta-x.eta(), delta_phi(phi,x.phi))
                 sorted_genmuons = sorted(genmuons, key=calc_dr)
                 if len(sorted_genmuons) > 0:
                     matched_genmu = sorted_genmuons[0]
@@ -1249,7 +1275,7 @@ class Looper(object):
                 if matched_genmu is not None:
                     muon.genMatch_dr = calc_dr(matched_genmu)
                     branches[pfx+"genMatch_dr"][0] = muon.genMatch_dr
-                    branches[pfx+"genMatch_pt"][0] = matched_genmu.pt()
+                    branches[pfx+"genMatch_pt"][0] = matched_genmu.pt
                     branches[pfx+"genMatch_eta"][0] = matched_genmu.eta()
                     branches[pfx+"genMatch_phi"][0] = matched_genmu.phi()
                     branches[pfx+"genMatch_m"][0] = matched_genmu.mass()
@@ -1305,10 +1331,10 @@ class Looper(object):
                 dv = selected_dvs[0]
                 mu1p4 = r.TLorentzVector()
                 mu2p4 = r.TLorentzVector()
-                mu1p4.SetPtEtaPhiM(mu1.pt(), mu1.eta(), mu1.phi(), MUON_MASS)
-                mu2p4.SetPtEtaPhiM(mu2.pt(), mu2.eta(), mu2.phi(), MUON_MASS)
+                mu1p4.SetPtEtaPhiM(mu1.pt, mu1.eta, mu1.phi, MUON_MASS)
+                mu2p4.SetPtEtaPhiM(mu2.pt, mu2.eta, mu2.phi, MUON_MASS)
                 dimuon = (mu1p4+mu2p4)
-                vecdv2d = r.TVector2(dv.x()-pvmx, dv.y()-pvmy)
+                vecdv2d = r.TVector2(dv.x-pvmx, dv.y-pvmy)
                 vecdimuon2d = r.TVector2(dimuon.Px(),dimuon.Py())
                 cosphi = (vecdv2d.Px()*vecdimuon2d.Px() + vecdv2d.Py()*vecdimuon2d.Py()) / (vecdv2d.Mod()*vecdimuon2d.Mod())
                 # definition on s2 of https://indico.cern.ch/event/846681/contributions/3557724/attachments/1907377/3150380/Displaced_Scouting_Status_Update.pdf
@@ -1319,8 +1345,8 @@ class Looper(object):
                 # corrected p4s with phi calculated at DV instead of track reference point.
                 mu1p4_corr = r.TLorentzVector()
                 mu2p4_corr = r.TLorentzVector()
-                mu1p4_corr.SetPtEtaPhiM(mu1.pt(), mu1.eta(), mu1.phi_corr, MUON_MASS)
-                mu2p4_corr.SetPtEtaPhiM(mu2.pt(), mu2.eta(), mu2.phi_corr, MUON_MASS)
+                mu1p4_corr.SetPtEtaPhiM(mu1.pt, mu1.eta, mu1.phi_corr, MUON_MASS)
+                mu2p4_corr.SetPtEtaPhiM(mu2.pt, mu2.eta, mu2.phi_corr, MUON_MASS)
                 dimuon_corr = (mu1p4_corr+mu2p4_corr)
                 mass_pair1 = dimuon_corr.M()
 
@@ -1329,7 +1355,7 @@ class Looper(object):
 
                 absdphimumu = abs(mu1p4.DeltaPhi(mu2p4))
                 absdphimudv = abs(vecdimuon2d.DeltaPhi(vecdv2d))
-                dimuon_isos = mu1.charge()*mu2.charge() < 0
+                dimuon_isos = mu1.charge*mu2.charge < 0
                 branches["dimuon_isos"][0] = dimuon_isos
                 branches["dimuon_pt"][0] = dimuon_corr.Pt()
                 branches["dimuon_eta"][0] = dimuon_corr.Eta()
@@ -1344,17 +1370,17 @@ class Looper(object):
                 branches["logabsetaphi"][0] = logabsetaphi
                 branches["cosphi"][0] = cosphi
                 branches["lxy"][0] = lxy
-                branches["lxyError"][0] = ((dv.xError()*(dv.x()-pvmx))**2 + (dv.yError()*(dv.y()-pvmy))**2)**0.5 / lxy
+                branches["lxyError"][0] = ((dv.xError*(dv.x-pvmx))**2 + (dv.yError*(dv.y-pvmy))**2)**0.5 / lxy
 
                 # both muons need to have no excess hits if the displacement is >3.5cm (otherwise we're within the 1st bpix layer and extra hits don't make sense to calculate)
-                print(self.has_hit_info, len(muons))
-                for mu in muons:
-                    print(mu.nExpectedPixelHits)
+                #print(self.has_hit_info, len(muons))
+                #for mu in muons:
+                #    print(mu.nExpectedPixelHits)
                 try:
                     pass_excesshits = (
                             (lxy < 3.5) or
-                                ( (mu1.nValidPixelHits() - mu1.nExpectedPixelHits <= 0) and
-                                (mu2.nValidPixelHits() - mu2.nExpectedPixelHits <= 0)
+                                ( (mu1.nValidPixelHits - mu1.nExpectedPixelHits <= 0) and
+                                (mu2.nValidPixelHits - mu2.nExpectedPixelHits <= 0)
                                 )
                             )
                 except AttributeError:
@@ -1376,8 +1402,8 @@ class Looper(object):
                         )
                 branches["pass_dxyscaled"][0] = pass_dxyscaled
                 pass_dxysig = (
-                        (abs(mu1.dxyCorr/mu1.trk_dxyError()) > 2) and
-                        (abs(mu2.dxyCorr/mu2.trk_dxyError()) > 2)
+                        (abs(mu1.dxyCorr/mu1.trk_dxyError) > 2) and
+                        (abs(mu2.dxyCorr/mu2.trk_dxyError) > 2)
                         )
                 branches["pass_dxysig"][0] = pass_dxysig
 
@@ -1418,21 +1444,21 @@ class Looper(object):
                 dv = selected_dvs[1]
                 mu1p4 = r.TLorentzVector()
                 mu2p4 = r.TLorentzVector()
-                mu1p4.SetPtEtaPhiM(mu1.pt(), mu1.eta(), mu1.phi(), MUON_MASS)
-                mu2p4.SetPtEtaPhiM(mu2.pt(), mu2.eta(), mu2.phi(), MUON_MASS)
+                mu1p4.SetPtEtaPhiM(mu1.pt, mu1.eta, mu1.phi, MUON_MASS)
+                mu2p4.SetPtEtaPhiM(mu2.pt, mu2.eta, mu2.phi, MUON_MASS)
                 dimuon = (mu1p4+mu2p4)
-                vecdv2d = r.TVector2(dv.x()-pvmx, dv.y()-pvmy)
+                vecdv2d = r.TVector2(dv.x-pvmx, dv.y-pvmy)
                 vecdimuon2d = r.TVector2(dimuon.Px(),dimuon.Py())
                 cosphi = (vecdv2d.Px()*vecdimuon2d.Px() + vecdv2d.Py()*vecdimuon2d.Py()) / (vecdv2d.Mod()*vecdimuon2d.Mod())
                 lxy = vecdv2d.Mod()
                 logabsetaphi = math.log10(max(abs(mu1p4.Eta()-mu2p4.Eta()),1e-6)/max(abs(mu1p4.DeltaPhi(mu2p4)),1e-6))
-                dimuon_isos = mu1.charge()*mu2.charge() < 0
+                dimuon_isos = mu1.charge*mu2.charge < 0
 
                 # corrected p4s with phi calculated at DV instead of track reference point.
                 mu1p4_corr = r.TLorentzVector()
                 mu2p4_corr = r.TLorentzVector()
-                mu1p4_corr.SetPtEtaPhiM(mu1.pt(), mu1.eta(), mu1.phi_corr, MUON_MASS)
-                mu2p4_corr.SetPtEtaPhiM(mu2.pt(), mu2.eta(), mu2.phi_corr, MUON_MASS)
+                mu1p4_corr.SetPtEtaPhiM(mu1.pt, mu1.eta, mu1.phi_corr, MUON_MASS)
+                mu2p4_corr.SetPtEtaPhiM(mu2.pt, mu2.eta, mu2.phi_corr, MUON_MASS)
                 # save nominal 2 muons first
                 orig_dimuon_corr = dimuon_corr
                 dimuon_corr = (mu1p4_corr+mu2p4_corr)
@@ -1444,7 +1470,7 @@ class Looper(object):
 
                 absdphimumu = abs(mu1p4.DeltaPhi(mu2p4))
                 absdphimudv = abs(vecdimuon2d.DeltaPhi(vecdv2d))
-                dimuon_isos = mu1.charge()*mu2.charge() < 0
+                dimuon_isos = mu1.charge*mu2.charge < 0
                 branches["sublead_dimuon_isos"][0] = dimuon_isos
                 branches["sublead_dimuon_pt"][0] = dimuon_corr.Pt()
                 branches["sublead_dimuon_eta"][0] = dimuon_corr.Eta()
@@ -1459,13 +1485,13 @@ class Looper(object):
 
                 pass_excesshits = (
                         (lxy < 3.5) or 
-                            ( (mu1.nValidPixelHits() - mu1.nExpectedPixelHits <= 0) and
-                              (mu2.nValidPixelHits() - mu2.nExpectedPixelHits <= 0)
+                            ( (mu1.nValidPixelHits - mu1.nExpectedPixelHits <= 0) and
+                              (mu2.nValidPixelHits - mu2.nExpectedPixelHits <= 0)
                             )
                         )
-                print(pass_excesshits)
-                print(self.has_hit_info)
-                print(mu1.nExpectedPixelHits)
+                #print(pass_excesshits)
+                #print(self.has_hit_info)
+                #print(mu1.nExpectedPixelHits)
                 pass_materialveto = True  # FIXME: (dv.distPixel > 0.05)
 
                 # NOTE loosened wrt 2mu
@@ -1475,8 +1501,8 @@ class Looper(object):
                         )
                 # NOTE loosened wrt 2mu
                 pass_dxysig = (
-                        (abs(mu1.dxyCorr/mu1.trk_dxyError()) > 1) and
-                        (abs(mu2.dxyCorr/mu2.trk_dxyError()) > 1)
+                        (abs(mu1.dxyCorr/mu1.trk_dxyError) > 1) and
+                        (abs(mu2.dxyCorr/mu2.trk_dxyError) > 1)
                         )
 
                 branches["sublead_pass_genmatch"][0] = ((mu1.genMatch_dr < 0.1) and (mu2.genMatch_dr < 0.1)) or (not self.is_mc)
@@ -1663,6 +1689,7 @@ class Looper(object):
         print(">>> Output tree has size {:.1f}MB and {} events".format(os.stat(self.fname_out).st_size/1e6,neventsout))
 
         if (ievt != nevents_in):
+            print(ievt, nevents_in)
             print(">>> Looped over {} entries instead of {}. Raising exit code=2.".format(ievt,nevents_in))
             sys.exit(2)
         if (self.expected > 0) and (int(self.expected) != ievt):
