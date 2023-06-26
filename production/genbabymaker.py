@@ -819,7 +819,13 @@ class Looper(object):
         make_branch("GenMuon_grandmotherId", "vi")
         make_branch("GenMuon_grandmother_m", "vf")
         make_branch('GenMuon_mothers_dR', 'vf')
-        make_branch('GenMuon_mothers_idx', 'vi')
+        make_branch('GenMuon_mother_idx', 'vi')
+        make_branch('GenMuon_grandmother_idx', 'vi')
+        make_branch('GenPart_pt', 'vf')
+        make_branch('GenPart_eta', 'vf')
+        make_branch('GenPart_phi', 'vf')
+        make_branch('GenPart_m', 'vf')
+        #make_branch("GenMuon_mothers_data", 'vvf')
         '''
 
         make_branch("BS_x", "f")
@@ -1100,11 +1106,25 @@ class Looper(object):
             ]
             genmuons = []
             motherveto = []
+
+
+            #print(genparts[-1].pt()) 
+            for genpart in genparts:
+                branches["GenPart_pt"].push_back(genpart.pt())
+                branches["GenPart_eta"].push_back(genpart.eta())
+                branches["GenPart_phi"].push_back(genpart.phi())
+                branches["GenPart_m"].push_back(genpart.mass())
+                               
+
+
+
+
+
             for genpart in genparts:
                 #print("Check for GenMuon")
                 pdgid = genpart.pdgId()
                 #if abs(pdgid) == 13: print(pdgid)
-                #if abs(pdgid) not in [13]: continue
+                if abs(pdgid) not in [13]: continue
                 #if abs(pdgid) not in exotics+[13,23,25,6000211,3000022,999999,1999999]: continue
                 #print("Count")
                 motheridx = genpart.motherRef().index()
@@ -1139,12 +1159,15 @@ class Looper(object):
                     branches["GenMuon_pdgId"].push_back(pdgid)
                     branches["GenMuon_motherId"].push_back(motherid)
                     branches["GenMuon_mother_m"].push_back(mother.mass())
-                    grandmother = genparts[mother.motherRef().index()]
+                    grandmotheridx = mother.motherRef().index()
+                    grandmother = genparts[grandmotheridx]
                     grandmotherid = grandmother.pdgId()
                     branches["GenMuon_grandmotherId"].push_back(grandmotherid)
                     branches["GenMuon_grandmother_m"].push_back(grandmother.mass())
                     branches['GenMuon_mothers_dR'].push_back(dR(mother, grandmother))
-                    branches["GenMuon_mothers_idx"].push_back(motheridx)
+                    #branches["GenMuon_mothers_data"].push_back([grandmotheridx, motheridx, genpart.pt(), genpart.eta(), genpart.phi(), genpart.mass()])
+                    branches["GenMuon_mother_idx"].push_back(motheridx)
+                    branches["GenMuon_grandmother_idx"].push_back(grandmotheridx)
                     # if (genpart.pt() > 3.) and (abs(genpart.eta()) < 2.4):
                     #     nFiducialMuon_norho += 1
                     #     if (math.hypot(genpart.vx(),genpart.vy())<11.):
