@@ -1,0 +1,5 @@
+*.o
+temp_data
+*.exe
+rootDict.cc
+*_rdict.pcm
