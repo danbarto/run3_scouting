@@ -2,7 +2,7 @@
 
 Clone this repo with
 ``` shell
-git clone --recursive https://github.com/danbarto/run3_scouting.git
+git clone --recursive https://github.com/cmstas/run3_scouting.git
 ```
 
 This is a draft of some potential analysis code, based on uproot and coffea.
