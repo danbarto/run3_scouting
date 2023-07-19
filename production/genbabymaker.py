@@ -825,6 +825,12 @@ class Looper(object):
         make_branch('GenPart_eta', 'vf')
         make_branch('GenPart_phi', 'vf')
         make_branch('GenPart_m', 'vf')
+        make_branch('GenPart_vx', 'vf')
+        make_branch('GenPart_vy', 'vf')
+        make_branch('GenPart_vz', 'vf')
+        make_branch('GenPart_lxy', 'vf')
+        make_branch('GenPart_Id', 'vf')
+        make_branch('GenPart_mother_Id', 'vi')
         #make_branch("GenMuon_mothers_data", 'vvf')
         '''
 
@@ -1114,10 +1120,15 @@ class Looper(object):
                 branches["GenPart_eta"].push_back(genpart.eta())
                 branches["GenPart_phi"].push_back(genpart.phi())
                 branches["GenPart_m"].push_back(genpart.mass())
-                               
-
-
-
+                branches["GenPart_vx"].push_back(genpart.vx())
+                branches["GenPart_vy"].push_back(genpart.vy())
+                branches["GenPart_vz"].push_back(genpart.vz())
+                branches["GenPart_lxy"].push_back(math.hypot(genpart.vx(), genpart.vy()))
+                branches["GenPart_Id"].push_back(genpart.pdgId())
+                if (genpart == genparts[0]) or (genpart == genparts[1]):
+                    branches["GenPart_mother_Id"].push_back(-1)
+                else:
+                    branches["GenPart_mother_Id"].push_back(genparts[genpart.motherRef().index()].pdgId())
 
 
             for genpart in genparts:
